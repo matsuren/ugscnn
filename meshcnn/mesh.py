@@ -1,8 +1,10 @@
-from .mesh_utils import *
-import scipy.sparse as sparse
-import pyigl as igl
-import pickle
 import os
+import pickle
+
+import igl
+import scipy.sparse as sparse
+
+from .mesh_utils import *
 
 
 def export_spheres(int_list, dest_folder):
@@ -90,22 +92,22 @@ class icosphere(object):
         self.vertices = new_vertices
         self.faces = new_faces
         self.intp = src_id
-    
+
     def normalize(self, radius=1):
         '''
         Reproject to spherical surface
         '''
         vectors = self.vertices
-        scalar = (vectors ** 2).sum(axis=1)**.5
+        scalar = (vectors ** 2).sum(axis=1) ** .5
         unit = vectors / scalar.reshape((-1, 1))
         offset = radius - scalar
         self.vertices += unit * offset.reshape((-1, 1))
-        
+
     def icosahedron(self, upward=True):
         """
         Create an icosahedron, a 20 faced polyhedron.
         """
-        t = (1.0 + 5.0**.5) / 2.0
+        t = (1.0 + 5.0 ** .5) / 2.0
         vertices = [-1, t, 0, 1, t, 0, -1, -t, 0, 1, -t, 0, 0, -1, t, 0, 1, t,
                     0, -1, -t, 0, 1, -t, t, 0, -1, t, 0, 1, -t, 0, -1, -t, 0, 1]
         faces = [0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11,
@@ -122,7 +124,7 @@ class icosphere(object):
     def xyz2latlong(self):
         x, y, z = self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2]
         long = np.arctan2(y, x)
-        xy2 = x**2 + y**2
+        xy2 = x ** 2 + y ** 2
         lat = np.arctan2(z, np.sqrt(xy2))
         return lat, long
 
@@ -138,13 +140,13 @@ class icosphere(object):
         ni = self._find_neighbor(F_ico, ind)[0]
         vec = V_ico[ni].copy()
         vec[2] = 0
-        vec = vec/np.linalg.norm(vec)
+        vec = vec / np.linalg.norm(vec)
         y_ = np.eye(3)[1]
 
         k = np.eye(3)[2]
         crs = np.cross(vec, y_)
         ct = -np.dot(vec, y_)
-        st = -np.sign(crs[-1])*np.linalg.norm(crs)
+        st = -np.sign(crs[-1]) * np.linalg.norm(crs)
         R2 = self._rot_matrix(k, ct, st)
         V_ico = V_ico.dot(R2)
         return V_ico
@@ -164,7 +166,7 @@ class icosphere(object):
         R = []
         for i in range(3):
             v = I[i]
-            vr = v*cos_t+np.cross(k, v)*sin_t+k*(k.dot(v))*(1-cos_t)
+            vr = v * cos_t + np.cross(k, v) * sin_t + k * (k.dot(v)) * (1 - cos_t)
             R.append(vr)
         R = np.stack(R, axis=-1)
         return R
@@ -190,13 +192,13 @@ class icosphere(object):
         ni = self._find_neighbor(f0_, ind)[0]
         vec = v0_[ni].copy()
         vec[2] = 0
-        vec = vec/np.linalg.norm(vec)
+        vec = vec / np.linalg.norm(vec)
         y_ = np.eye(3)[1]
 
         k = np.eye(3)[2]
         crs = np.cross(vec, y_)
         ct = np.dot(vec, y_)
-        st = -np.sign(crs[-1])*np.linalg.norm(crs)
+        st = -np.sign(crs[-1]) * np.linalg.norm(crs)
 
         R2 = self._rot_matrix(k, ct, st)
         return R.dot(R2)
@@ -213,29 +215,19 @@ class icosphere(object):
             seq.append(s)
         return tuple(seq)
 
-
     def construct_matrices(self):
         """
         Construct FEM matrices
         """
-        V = p2e(self.vertices)
-        F = p2e(self.faces)
+        V = self.vertices
+        F = self.faces
         # Compute gradient operator: #F*3 by #V
-        G = igl.eigen.SparseMatrixd()
-        L = igl.eigen.SparseMatrixd()
-        M = igl.eigen.SparseMatrixd()
-        N = igl.eigen.MatrixXd()
-        A = igl.eigen.MatrixXd()
-        igl.grad(V, F, G)
-        igl.cotmatrix(V, F, L)
-        igl.per_face_normals(V, F, N)
-        igl.doublearea(V, F, A)
-        igl.massmatrix(V, F, igl.MASSMATRIX_TYPE_VORONOI, M)
-        G = e2p(G)
-        L = e2p(L)
-        N = e2p(N)
-        A = e2p(A)
-        M = e2p(M)
+        G = igl.grad(V, F).tocoo()
+        L = igl.cotmatrix(V, F).tocoo()
+        N = igl.per_face_normals(V, F, np.array([0., 0., 0.]))
+        A = igl.doublearea(V, F)
+        A = A[:, np.newaxis]
+        M = igl.massmatrix(V, F, igl.MASSMATRIX_TYPE_VORONOI).tocoo()
         M = M.data
         # Compute latitude and longitude directional vector fields
         NS = np.reshape(G.dot(self.lat), [self.nf, 3], order='F')
@@ -247,18 +239,17 @@ class icosphere(object):
         one = np.ones(self.nf * 3)
         adj = sparse.csc_matrix((one, (i, j)), shape=(self.nv, self.nf))
         tot_area = adj.dot(A)
-        norm_area = A.ravel().repeat(3)/np.squeeze(tot_area[i])
+        norm_area = A.ravel().repeat(3) / np.squeeze(tot_area[i])
         F2V = sparse.csc_matrix((norm_area, (i, j)), shape=(self.nv, self.nf))
         # Compute interpolation matrix
         if self.level > 0:
             intp = self.intp[self.nv_prev:]
             i = np.concatenate((np.arange(self.nv), np.arange(self.nv_prev, self.nv)))
             j = np.concatenate((np.arange(self.nv_prev), intp[:, 0], intp[:, 1]))
-            ratio = np.concatenate((np.ones(self.nv_prev), 0.5*np.ones(2*intp.shape[0])))
+            ratio = np.concatenate((np.ones(self.nv_prev), 0.5 * np.ones(2 * intp.shape[0])))
             intp = sparse.csc_matrix((ratio, (i, j)), shape=(self.nv, self.nv_prev))
         else:
             intp = sparse.csc_matrix(np.eye(self.nv))
-        
 
         # Compute vertex mean matrix
         self.G = G  # gradient matrix
@@ -267,7 +258,7 @@ class icosphere(object):
         self.NS = NS  # north-south vectors (per-triangle)
         self.EW = EW  # east-west vectors (per-triangle)
         self.F2V = F2V  # map face quantities to vertices
-        self.M = M # mass matrix (area of voronoi cell around node. for integration)
+        self.M = M  # mass matrix (area of voronoi cell around node. for integration)
         self.Seq = self._rotseq(self.vertices)
         self.Intp = intp
 
@@ -276,14 +267,9 @@ class icosphere(object):
         with open(filename, "wb") as f:
             pickle.dump(self.info, f)
 
-# from pdb import set_trace; set_trace()
+# %
+# from meshplot import plot, subplot, interact
 # s = icosphere(2)
-# a = 0
-# import pyigl as igl
-# from iglhelpers import p2e
-# # visualize
-# v = p2e(s.vertices)
-# f = p2e(s.faces)
-# viewer = igl.glfw.Viewer()
-# viewer.data().set_mesh(v, f)
-# viewer.launch()
+# v = s.vertices
+# f = s.faces
+# plot(v,f)

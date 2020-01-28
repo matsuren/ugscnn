@@ -3,8 +3,7 @@ import os
 
 def main():
     try:
-        sys.path.append("meshcnn")
-        from mesh import export_spheres
+        from meshcnn.mesh import export_spheres
         export_spheres(range(8), "mesh_files")
     except ImportError:
         print("ImportError occurred. Will download precomputed mesh files instead...")
