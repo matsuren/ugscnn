@@ -2,7 +2,7 @@ from PIL import Image
 from resizeimage import resizeimage
 from glob import glob
 import os
-from scipy.misc import imread, imsave
+from imageio import imread, imsave
 
 res = [512, 256]
 areas = ["1", "2", "3", "4", "5a", "5b", "6"]

@@ -45,7 +45,7 @@ def test(args, model, device, test_loader, logger):
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
+            test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
             pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
 
@@ -128,11 +128,11 @@ def main():
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
     for epoch in range(1, args.epochs + 1):
-        if args.decay:
-            scheduler.step()
         logger.info("[Epoch {}]".format(epoch))
         train(args, model, device, train_loader, optimizer, epoch, logger)
         test(args, model, device, test_loader, logger)
+        if args.decay:
+            scheduler.step()
 
         
 if __name__ == "__main__":

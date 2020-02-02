@@ -3,7 +3,7 @@ from glob import glob
 import os
 import random
 from torch.utils.data import Dataset
-from scipy.misc import imread
+from imageio import imread
 
 # precomputed mean and std of the dataset
 precomp_mean = [0.4974898, 0.47918808, 0.42809588, 1.0961773]
