@@ -85,7 +85,7 @@ def remap(img, img_idx, cval=[0, 0, 0], method="linear"):
         x = map_coordinates(img, img_idx, order=order, cval=cval[0])
     elif img.ndim == 3:
         # color
-        x = np.zeros([*outshape, img.shape[2]], dtype=img.dtype)
+        x = np.zeros([*img_idx.shape[1:], img.shape[2]], dtype=img.dtype)
         for i in range(img.shape[2]):
             x[..., i] = map_coordinates(img[..., i], img_idx, order=order, cval=cval[i])
     else:
@@ -128,6 +128,9 @@ def uv2img_idx(uv, erp_img):
 
 def erp2sphere(erp_img, V, method="linear", dtype=np.float32):
     """
+
+    Parameters
+    ----------
     erp_img: equirectangular projection image
     V: array of spherical coordinates of shape (n_vertex, 3)
     method: interpolation method. "linear" or "nearest"
