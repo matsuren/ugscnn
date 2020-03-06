@@ -15,13 +15,13 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch import nn
-
+from tqdm import tqdm
 
 def train(args, model, device, train_loader, optimizer, epoch, logger):
     model.train()
     train_loss = 0
     correct = 0
-    for batch_idx, (data, target) in enumerate(train_loader):
+    for batch_idx, (data, target) in enumerate(tqdm(train_loader)):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
@@ -42,7 +42,7 @@ def test(args, model, device, test_loader, logger):
     test_loss = 0
     correct = 0
     with torch.no_grad():
-        for data, target in test_loader:
+        for data, target in tqdm(test_loader):
             data, target = data.to(device), target.to(device)
             output = model(data)
             test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
@@ -109,6 +109,7 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     trainset = MNIST_S2_Loader(args.datafile, "train")
+    print('len(trainset)', len(trainset))
     testset = MNIST_S2_Loader(args.datafile, "test")
     train_loader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = DataLoader(testset, batch_size=args.batch_size, shuffle=True, **kwargs)
